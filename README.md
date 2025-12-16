@@ -14,10 +14,3 @@ git clone https://github.com/eldergod1800/kswitch-arch.git
 cd kswitch-arch
 makepkg -si
 
-This will download the upstream KSwitch sources, build the package, and
-install it on your system.
-Requirements
-
-    Arch Linux (or Arch-based distro)
-    base-devel group installed
-    git installed
