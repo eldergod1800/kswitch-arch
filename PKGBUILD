@@ -1,6 +1,6 @@
 # Maintainer: https://github.com/Zyren-Lab/KSwitch
 pkgname=kswitch-data-transfer
-pkgver=1.0.0
+pkgver=1.0.2-1
 pkgrel=1
 pkgdesc="Open-source data transfer tool for Linux - Samsung Smart Switch alternative"
 arch=('x86_64')
