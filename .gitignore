@@ -1,22 +1,6 @@
-# Build directories
-build/
+src/
 pkg/
-
-# Build artifacts
 *.tar.zst
 *.log
 *.cache
 *.tmp
-*.o
-*.so
-*.a
-moc_*.cpp
-qrc_*.cpp
-
-# IDE
-.vscode/
-.idea/
-*.user
-
-# Application data (for testing)
-tasks.json

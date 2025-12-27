@@ -1,9 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file>../qml/main.qml</file>
-        <file>../qml/TaskListView.qml</file>
-        <file>../qml/TaskDelegate.qml</file>
-        <file>../qml/TaskEditor.qml</file>
-        <file>../qml/DatePicker.qml</file>
-    </qresource>
-</RCC>
