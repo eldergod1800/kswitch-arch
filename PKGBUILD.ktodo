@@ -1,0 +1,29 @@
+# Maintainer: Your Name <your.email@example.com>
+pkgname=ktodo
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="KDE task manager with hierarchical subtasks support"
+arch=('x86_64')
+url="https://github.com/yourusername/ktodo"
+license=('GPL3')
+depends=('qt5-base' 'qt5-quickcontrols2' 'qt5-declarative' 'kirigami2' 'kconfig' 'ki18n' 'kcoreaddons')
+makedepends=('cmake' 'extra-cmake-modules' 'git')
+source=()
+sha256sums=()
+
+build() {
+  # Since we're building from the current directory
+  cd "$startdir"
+
+  cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DKDE_INSTALL_USE_QT_SYS_PATHS=ON
+
+  cmake --build build
+}
+
+package() {
+  cd "$startdir"
+  DESTDIR="$pkgdir" cmake --install build
+}
