@@ -1,0 +1,168 @@
+name: Auto-update KSwitch Package
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for upstream updates
+        id: check_version
+        run: |
+          set -euo pipefail
+
+          # Get latest upstream release
+          LATEST_RELEASE=$(curl -fsSL https://api.github.com/repos/Zyren-Lab/KSwitch/releases/latest | jq -r '.tag_name')
+          echo "Latest upstream version: $LATEST_RELEASE"
+
+          # Get current version from PKGBUILD
+          CURRENT_VERSION=$(grep -m1 '^pkgver=' PKGBUILD | cut -d'=' -f2)
+          echo "Current version: $CURRENT_VERSION"
+
+          # Store versions (properly escaped)
+          {
+            echo "latest_version=$LATEST_RELEASE"
+            echo "current_version=$CURRENT_VERSION"
+          } >> "$GITHUB_OUTPUT"
+
+          # Check if update is needed
+          if [ "$LATEST_RELEASE" != "$CURRENT_VERSION" ]; then
+            echo "update_needed=true" >> "$GITHUB_OUTPUT"
+            echo "Update available: $CURRENT_VERSION -> $LATEST_RELEASE"
+          else
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Already up to date"
+          fi
+
+      - name: Download and calculate checksum
+        if: steps.check_version.outputs.update_needed == 'true'
+        id: checksum
+        env:
+          NEW_VERSION: ${{ steps.check_version.outputs.latest_version }}
+        run: |
+          set -euo pipefail
+
+          # Clone the repository at the specific tag
+          git clone --depth 1 --branch "$NEW_VERSION" https://github.com/Zyren-Lab/KSwitch.git kswitch-source
+          cd kswitch-source
+
+          # Calculate checksum of the git repository
+          CHECKSUM=$(git rev-parse HEAD)
+          echo "Git commit hash: $CHECKSUM"
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+
+          cd ..
+          rm -rf kswitch-source
+
+      - name: Update PKGBUILD
+        if: steps.check_version.outputs.update_needed == 'true'
+        env:
+          NEW_VERSION: ${{ steps.check_version.outputs.latest_version }}
+          NEW_CHECKSUM: ${{ steps.checksum.outputs.checksum }}
+        run: |
+          set -euo pipefail
+
+          # Update version
+          sed -i "s/^pkgver=.*/pkgver=${NEW_VERSION}/" PKGBUILD
+
+          # Update source URL tag
+          sed -i "s|source=.*|source=(\"git+https://github.com/Zyren-Lab/KSwitch.git#tag=${NEW_VERSION}\")|" PKGBUILD
+
+          echo "PKGBUILD updated to version $NEW_VERSION"
+
+      - name: Update .SRCINFO
+        if: steps.check_version.outputs.update_needed == 'true'
+        uses: docker://archlinux:latest
+        with:
+          args: /bin/bash -c "pacman -Sy --noconfirm binutils fakeroot && cd /github/workspace && makepkg --printsrcinfo > .SRCINFO"
+
+      - name: Build package
+        if: steps.check_version.outputs.update_needed == 'true'
+        uses: docker://archlinux:latest
+        with:
+          args: /bin/bash -c "pacman -Sy --noconfirm base-devel git jdk17-openjdk && cd /github/workspace && useradd -m builder && chown -R builder:builder . && sudo -u builder makepkg --noconfirm"
+
+      - name: Get built package name
+        if: steps.check_version.outputs.update_needed == 'true'
+        id: package
+        run: |
+          set -euo pipefail
+
+          PACKAGE_FILE=$(ls *.pkg.tar.zst 2>/dev/null | head -n1 || echo "")
+          if [ -n "$PACKAGE_FILE" ]; then
+            echo "package_file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
+            echo "Built package: $PACKAGE_FILE"
+          else
+            echo "No package file found"
+          fi
+
+      - name: Commit and push changes
+        if: steps.check_version.outputs.update_needed == 'true'
+        env:
+          NEW_VERSION: ${{ steps.check_version.outputs.latest_version }}
+        run: |
+          set -euo pipefail
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to v${NEW_VERSION}"
+          git push
+
+      - name: Create GitHub Release
+        if: steps.check_version.outputs.update_needed == 'true' && steps.package.outputs.package_file != ''
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.check_version.outputs.latest_version }}
+          PACKAGE_FILE: ${{ steps.package.outputs.package_file }}
+        with:
+          tag_name: v${{ steps.check_version.outputs.latest_version }}
+          name: KSwitch ${{ steps.check_version.outputs.latest_version }}
+          body: |
+            Automated update to KSwitch version ${{ steps.check_version.outputs.latest_version }}
+
+            Upstream release: https://github.com/Zyren-Lab/KSwitch/releases/tag/${{ steps.check_version.outputs.latest_version }}
+
+            ## Installation
+            Download the .pkg.tar.zst file and install with:
+            ```bash
+            sudo pacman -U ${{ steps.package.outputs.package_file }}
+            ```
+          files: |
+            *.pkg.tar.zst
+
+      - name: Summary
+        if: always()
+        env:
+          UPDATE_NEEDED: ${{ steps.check_version.outputs.update_needed }}
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+          LATEST_VERSION: ${{ steps.check_version.outputs.latest_version }}
+          PACKAGE_FILE: ${{ steps.package.outputs.package_file }}
+        run: |
+          if [ "$UPDATE_NEEDED" == "true" ]; then
+            {
+              echo "## Update completed! :rocket:"
+              echo ""
+              echo "- **Previous version:** $CURRENT_VERSION"
+              echo "- **New version:** $LATEST_VERSION"
+              echo "- **Package:** $PACKAGE_FILE"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## No update needed :white_check_mark:"
+              echo ""
+              echo "Current version $CURRENT_VERSION is up to date"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
