@@ -1,6 +1,6 @@
 # Maintainer: https://github.com/Zyren-Lab/KSwitch
 pkgname=kswitch-data-transfer
-pkgver=1.0.3
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Open-source data transfer tool for Linux - Samsung Smart Switch alternative"
 arch=('x86_64')
@@ -9,8 +9,8 @@ license=('GPL3')
 depends=('java-runtime>=17' 'android-tools')
 makedepends=('git' 'jdk17-openjdk')
 conflicts=('kswitch')
-source=("git+https://github.com/Zyren-Lab/KSwitch.git#tag=${pkgver}")
-sha256sums=('5f1e486b2cf04be3ef216c91a1206797a3de2b50c640ee74ff357d058ab6f336')
+source=("git+https://github.com/Zyren-Lab/KSwitch.git#tag=v${pkgver}")
+sha256sums=('8333eeffb9d42f38bd7bc9ff72aa7dc5507f0ac566e1ec2340dd4dfae4286489')
 
 build() {
   cd "$srcdir/KSwitch"
